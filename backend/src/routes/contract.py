@@ -174,17 +174,17 @@ def stamp_contract(contract_id):
         
         if not stamp_positions:
             return jsonify({'error': '缺少印章位置信息'}), 400
-        
-        # 这里简化处理，实际应该从seal表获取印章图片
-        # 暂时使用默认印章图片路径
-        stamp_image_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            'static', 'default_seal.png'
-        )
-        
-        # 创建默认印章图片（如果不存在）
-        if not os.path.exists(stamp_image_path):
-            self._create_default_seal(stamp_image_path)
+
+        # 使用真实印章图片
+        if not seal_id:
+            return jsonify({'error': '缺少印章ID'}), 400
+
+        from src.models.seal import Seal
+        seal = Seal.query.get(seal_id)
+        if not seal or not seal.image_path or not os.path.exists(seal.image_path):
+            return jsonify({'error': '印章图片不存在'}), 404
+
+        stamp_image_path = seal.image_path
         
         # 生成输出文件名
         pdf_processor = PDFProcessor()
