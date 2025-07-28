@@ -184,6 +184,6 @@ class PDFProcessor:
         safe_counterparty = "".join(c for c in counterparty_abbr if c.isalnum() or c in ('-', '_'))
         safe_contract_name = "".join(c for c in contract_name if c.isalnum() or c in ('-', '_', '（', '）', '(', ')'))
         
-        filename = f"{safe_contract_number}{safe_counterparty}{safe_contract_name}.pdf"
+        filename = f"{safe_contract_number}-{safe_counterparty}-{safe_contract_name}.pdf"
         return filename
 

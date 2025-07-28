@@ -1,11 +1,66 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { Eye, ArrowLeft, ArrowRight, Move } from 'lucide-react'
 import Draggable from 'react-draggable'
 import '@/assets/pdf_viewer.css'
-import CanvasLayer from './CanvasLayer'
+
+const PdfCanvas = React.memo(
+  function PdfCanvas({ pdfDoc, currentPage, pageSize, canvasRef }) {
+    useEffect(() => {
+      let renderTask = null
+      let cancelled = false
+      const renderPage = async () => {
+        if (!pdfDoc || !canvasRef.current || !pageSize.width) return
+        try {
+          const page = await pdfDoc.getPage(currentPage)
+          const viewport = page.getViewport({ scale: 1 })
+          const canvas = canvasRef.current
+          const context = canvas.getContext('2d')
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          renderTask = page.render({ canvasContext: context, viewport })
+          await renderTask.promise
+        } catch (e) {
+          if (!cancelled) {
+            // 这里不处理 toast，错误交给父组件
+            window.dispatchEvent(new CustomEvent('pdf-render-error', { detail: e }))
+          }
+        }
+      }
+      renderPage()
+      return () => {
+        cancelled = true
+        if (renderTask && renderTask.cancel) renderTask.cancel()
+      }
+    }, [pdfDoc, currentPage, pageSize.width])
+
+    return (
+      <canvas
+        ref={canvasRef}
+        width={pageSize.width}
+        height={pageSize.height}
+        style={{
+          width: `${pageSize.width}px`,
+          height: `${pageSize.height}px`,
+          display: 'block',
+          borderRadius: 8,
+          background: '#fff',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          zIndex: 1
+        }}
+      />
+    )
+  },
+  (prevProps, nextProps) =>
+    prevProps.pdfDoc === nextProps.pdfDoc &&
+    prevProps.currentPage === nextProps.currentPage &&
+    prevProps.pageSize.width === nextProps.pageSize.width &&
+    prevProps.pageSize.height === nextProps.pageSize.height
+)
 
 const StepThree = ({ contractData, onComplete, onPrev }) => {
   const [loading, setLoading] = useState(false)
@@ -74,40 +129,12 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
     getPageSize()
   }, [pdfDoc, currentPage])
 
-  // 2. 渲染PDF（只在 pageSize、pdfDoc、currentPage 都有值时）
-  useEffect(() => {
-    let renderTask = null
-    let cancelled = false
-
-    const renderPage = async () => {
-      if (!pdfDoc || !canvasRef.current || !pageSize.width) return
-      try {
-        const page = await pdfDoc.getPage(currentPage)
-        const viewport = page.getViewport({ scale: 1 })
-        const canvas = canvasRef.current
-        const context = canvas.getContext('2d')
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        renderTask = page.render({ canvasContext: context, viewport })
-        await renderTask.promise
-      } catch (e) {
-        if (!cancelled) {
-          toast({ title: 'PDF渲染失败', description: e.message, variant: 'destructive' })
-        }
-      }
-    }
-    renderPage()
-    return () => {
-      cancelled = true
-      if (renderTask && renderTask.cancel) renderTask.cancel()
-    }
-  }, [pdfDoc, currentPage, pageSize.width, toast])
-
   // 拖拽事件
   const handleDrag = (id, e, data) => {
+
     setStampPositions(prev => prev.map(pos =>
       pos.id === id
-        ? { ...pos, x: data.x, y: data.y, page: currentPage - 1 }
+        ? { ...pos, x: data.x, y: data.y }
         : pos
     ))
   }
@@ -161,6 +188,15 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
   const handlePrevPage = () => setCurrentPage(p => Math.max(1, p - 1))
   const handleNextPageBtn = () => setCurrentPage(p => Math.min(numPages, p + 1))
 
+  // StepThree 组件内监听错误并弹 toast
+  useEffect(() => {
+    const handler = (e) => {
+      toast({ title: 'PDF渲染失败', description: e.detail.message, variant: 'destructive' })
+    }
+    window.addEventListener('pdf-render-error', handler)
+    return () => window.removeEventListener('pdf-render-error', handler)
+  }, [toast])
+
   return (
     <Card>
       <CardHeader>
@@ -209,23 +245,13 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
               background: '#f3f4f6'
             }}
           >
-            <canvas
-              ref={canvasRef}
-              width={pageSize.width}
-              height={pageSize.height}
-              style={{
-                width: `${pageSize.width}px`,
-                height: `${pageSize.height}px`,
-                display: 'block',
-                borderRadius: 8,
-                background: '#fff',
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                zIndex: 1
-              }}
+            <PdfCanvas
+              pdfDoc={pdfDoc}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              canvasRef={canvasRef}
             />
-            {/* 印章层 */}
+            {/* 印章层保持原样 */}
             <div
               style={{
                 position: 'absolute',
@@ -234,7 +260,7 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
                 width: `${pageSize.width}px`,
                 height: `${pageSize.height}px`,
                 zIndex: 2,
-                pointerEvents: 'none' // 关键：让印章层不挡住canvas
+                pointerEvents: 'none'
               }}
             >
               {stampPositions.filter(pos => (pos.page || 0) === (currentPage - 1)).map((position) => (
@@ -250,7 +276,7 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
                       width: position.width || 80,
                       height: position.height || 80,
                       zIndex: 10,
-                      pointerEvents: 'auto' // 关键：让印章可拖动
+                      pointerEvents: 'auto'
                     }}
                   >
                     <div className="text-xs text-red-700 text-center">
@@ -267,6 +293,40 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
                 </Draggable>
               ))}
             </div>
+          </div>
+          {/* 翻页与跳页控件，放在PDF预览区下方 */}
+          <div className="flex items-center justify-center space-x-2 bg-white bg-opacity-80 rounded px-3 py-2 shadow mt-4">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage <= 1}
+              onClick={handlePrevPage}
+            >
+              上一页
+            </Button>
+            <span className="text-sm mx-2">
+              第 {currentPage} 页 / 共 {numPages} 页
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage >= numPages}
+              onClick={handleNextPageBtn}
+            >
+              下一页
+            </Button>
+            <span className="ml-4 text-sm">跳转到：</span>
+            <input
+              type="number"
+              min={1}
+              max={numPages}
+              value={currentPage}
+              onChange={e => {
+                let val = Number(e.target.value)
+                if (val >= 1 && val <= numPages) setCurrentPage(val)
+              }}
+              className="w-16 px-2 py-1 border rounded text-center"
+            />
           </div>
         </div>
 
@@ -331,4 +391,3 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
 }
 
 export default StepThree
-
