@@ -46,8 +46,8 @@ const StepTwo = ({ contractData, onComplete, onPrev }) => {
         {
           x: 400,
           y: 600,
-          width: 80,
-          height: 80,
+          width: 120,
+          height: 120,
           page: 0,
           score: 1.0,
           reason: '默认位置：右下角'

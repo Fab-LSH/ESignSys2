@@ -61,36 +61,51 @@ class AIPositionDetector:
         return suggested_positions[:1]
     
     def _find_keyword_positions(self, text_blocks: List[Dict], page_width: float, page_height: float) -> List[Dict]:
-        """查找关键词相关的位置"""
+        """查找关键词相关的位置，'盖章'优先且分数最高"""
         keyword_positions = []
-        
         for block in text_blocks:
             text = block['text'].strip()
             bbox = block['bbox']  # [x0, y0, x1, y1]
-            
-            # 检查是否包含关键词
-            for keyword_pattern in self.signature_keywords:
-                if re.search(keyword_pattern, text):
-                    # 计算建议的盖章位置（关键词右侧或下方）
-                    x = bbox[2] + 20  # 关键词右侧
-                    y = bbox[1] - 10  # 稍微上移
-                    
-                    # 确保位置在页面范围内
-                    if x + 80 > page_width:
-                        x = bbox[0] - 100  # 如果右侧空间不够，放在左侧
-                    if y < 0:
-                        y = bbox[3] + 10  # 如果上方空间不够，放在下方
-                    
-                    position = {
-                        'x': max(0, x),
-                        'y': max(0, y),
-                        'width': 80,
-                        'height': 80,
-                        'score': 2.0,  # 关键词匹配的基础分数
-                        'reason': f'关键词匹配: {text[:20]}...'
-                    }
-                    keyword_positions.append(position)
-        
+
+            # 优先查找“盖章”
+            if re.search(r'盖章', text):
+                x = bbox[2] + 20
+                y = bbox[1] - 10
+                if x + 80 > page_width:
+                    x = bbox[0] - 100
+                if y < 0:
+                    y = bbox[3] + 10
+                position = {
+                    'x': max(0, x),
+                    'y': max(0, y),
+                    'width': 80,
+                    'height': 80,
+                    'score': 10.0,  # 最高分
+                    'reason': f'关键词优先匹配: {text[:20]}...'
+                }
+                keyword_positions.append(position)
+                # 如果只要第一个“盖章”就返回，可加break
+                # break
+
+            # 其它关键词
+            else:
+                for keyword_pattern in self.signature_keywords[1:]:
+                    if re.search(keyword_pattern, text):
+                        x = bbox[2] + 20
+                        y = bbox[1] - 10
+                        if x + 80 > page_width:
+                            x = bbox[0] - 100
+                        if y < 0:
+                            y = bbox[3] + 10
+                        position = {
+                            'x': max(0, x),
+                            'y': max(0, y),
+                            'width': 80,
+                            'height': 80,
+                            'score': 2.0,
+                            'reason': f'关键词匹配: {text[:20]}...'
+                        }
+                        keyword_positions.append(position)
         return keyword_positions
     
     def _analyze_page_layout(self, text_blocks: List[Dict], page_width: float, page_height: float) -> List[Dict]:
