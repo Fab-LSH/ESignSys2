@@ -11,7 +11,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-    server:{
+  server:{
+    host: '0.0.0.0',
+    port: 5678, // 前端端口
     proxy:{
       '/api': {
         target: 'http://localhost:5050', // 后端实际端口

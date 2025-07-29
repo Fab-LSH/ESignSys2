@@ -249,7 +249,7 @@ const SealManagement = ({ userId }) => {
                         />
                       </div>
                       <p className="mt-2 text-xs text-gray-500">
-                        支持PNG、JPG格式，建议尺寸100x100像素
+                        支持PNG、JPG格式，请上传透明背景的印章图片
                       </p>
                     </div>
                   </div>

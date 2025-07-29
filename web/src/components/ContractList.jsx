@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { FileText, Download, CheckCircle, XCircle, Clock, Eye } from 'lucide-react'
+import { FileText, Download, CheckCircle, XCircle, Clock, Eye, Trash2 } from 'lucide-react'
 
 const ContractList = ({ userId }) => {
   const [contracts, setContracts] = useState([])
@@ -66,9 +66,20 @@ const ContractList = ({ userId }) => {
     window.open(`/api/contract/download/${contractId}`, '_blank')
   }
 
-  const handlePreview = (contractId) => {
-    window.open(`/api/contract/preview/${contractId}`, '_blank')
+  // const handlePreview = (contractId) => {
+  //   window.open(`/api/contract/preview/${contractId}`, '_blank')
+  // }
+
+  const handlePreview = (contract) => {
+    // 预览已盖章合同（根据合同编号、签约对方简称、合同名查找）
+    const params = new URLSearchParams({
+      contract_number: contract.contract_number,
+      counterparty_abbr: contract.counterparty_abbr,
+      contract_name: contract.contract_name
+    }).toString()
+    window.open(`/api/contract/preview_final?${params}`, '_blank')
   }
+
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -135,51 +146,49 @@ const ContractList = ({ userId }) => {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-lg">{contract.contract_name}</CardTitle>
-                    <CardDescription>
-                      合同编号: {contract.contract_number} | 签约对方: {contract.counterparty_abbr}
-                    </CardDescription>
+                    <div className="flex flex-wrap items-center gap-4 mt-1">
+                      <span className="text-lg font-bold text-blue-700">
+                        合同编号: {contract.contract_number}
+                      </span>
+                      <span className="text-base font-semibold text-indigo-700">
+                        签约对方: {contract.counterparty_abbr}
+                      </span>
+                    </div>
                   </div>
                   {getStatusBadge(contract.status)}
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* 合同信息 */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">上传时间：</span>
-                      <span className="font-medium">{formatDate(contract.upload_date)}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">更新时间：</span>
-                      <span className="font-medium">{formatDate(contract.updated_at)}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">印章位置：</span>
-                      <span className="font-medium">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-500 font-medium">印章位置：</span>
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-3 py-1 rounded-full">
                         {contract.final_stamp_positions?.length || 0} 个
-                      </span>
+                      </Badge>
                     </div>
-                  </div>
-
-                  {/* AI建议位置 */}
-                  {contract.ai_suggested_positions && contract.ai_suggested_positions.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">AI建议位置：</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {contract.ai_suggested_positions.slice(0, 3).map((position, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            第{(position.page || 0) + 1}页 ({Math.round(position.x)}, {Math.round(position.y)})
-                          </Badge>
-                        ))}
-                        {contract.ai_suggested_positions.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{contract.ai_suggested_positions.length - 3} 个
-                          </Badge>
-                        )}
+                    {contract.ai_suggested_positions && contract.ai_suggested_positions.length > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500 font-medium">AI建议位置：</span>
+                        <div className="flex flex-wrap gap-2">
+                          {contract.ai_suggested_positions.slice(0, 3).map((position, index) => (
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1 rounded-full"
+                            >
+                              第{(position.page || 0) + 1}页 ({Math.round(position.x)}, {Math.round(position.y)})
+                            </Badge>
+                          ))}
+                          {contract.ai_suggested_positions.length > 3 && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1 rounded-full">
+                              +{contract.ai_suggested_positions.length - 3} 个
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* 操作按钮 */}
                   <div className="flex items-center justify-between pt-4 border-t">
@@ -187,7 +196,7 @@ const ContractList = ({ userId }) => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handlePreview(contract.id)}
+                        onClick={() => handlePreview(contract)}
                         className="flex items-center space-x-1"
                       >
                         <Eye className="h-4 w-4" />
@@ -205,6 +214,8 @@ const ContractList = ({ userId }) => {
                           <span>下载</span>
                         </Button>
                       )}
+
+
                     </div>
 
                     {/* 法务确认按钮 */}

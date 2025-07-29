@@ -305,6 +305,36 @@ def confirm_contract(contract_id):
     except Exception as e:
         return jsonify({'error': f'确认失败: {str(e)}'}), 500
 
+@contract_bp.route('/preview_final')
+def preview_final():
+    """
+    根据合同编号、签约对方简称、合同名称查找已盖章合同并预览
+    前端参数：contract_number, counterparty_abbr, contract_name
+    """
+    try:
+        contract_number = request.args.get('contract_number')
+        counterparty_abbr = request.args.get('counterparty_abbr')
+        contract_name = request.args.get('contract_name')
+
+        if not all([contract_number, counterparty_abbr, contract_name]):
+            return jsonify({'error': '缺少必要参数'}), 400
+
+        contract = Contract.query.filter_by(
+            contract_number=contract_number,
+            counterparty_abbr=counterparty_abbr,
+            contract_name=contract_name
+        ).first()
+
+        if not contract:
+            return jsonify({'error': '未找到对应合同'}), 404
+
+        if not contract.stamped_pdf_path or not os.path.exists(contract.stamped_pdf_path):
+            return jsonify({'error': '盖章文件不存在'}), 404
+
+        return send_file(contract.stamped_pdf_path, as_attachment=False)
+    except Exception as e:
+        return jsonify({'error': f'预览失败: {str(e)}'}), 500
+
 def _create_default_seal(output_path):
     """创建默认印章图片"""
     from PIL import Image, ImageDraw, ImageFont

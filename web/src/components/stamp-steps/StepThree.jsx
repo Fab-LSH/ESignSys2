@@ -5,6 +5,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Eye, ArrowLeft, ArrowRight, Move } from 'lucide-react'
 import Draggable from 'react-draggable'
 import '@/assets/pdf_viewer.css'
+import * as pdfjsLib from '../../../node_modules/pdfjs-dist/build/pdf'
+import '../../../node_modules/pdfjs-dist/build/pdf.worker.mjs'
 
 const PdfCanvas = React.memo(
   function PdfCanvas({ pdfDoc, currentPage, pageSize, canvasRef }) {
@@ -94,12 +96,9 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
   // 加载PDF.js并渲染第一页
   useEffect(() => {
     if (!pdfUrl) return
-    let script = document.createElement('script')
-    script.src = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js`
-    script.onload = async () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
+    const loadPdf = async () => {
       try {
-        const loadingTask = window.pdfjsLib.getDocument(pdfUrl)
+        const loadingTask = pdfjsLib.getDocument(pdfUrl)
         const pdf = await loadingTask.promise
         setPdfDoc(pdf)
         setNumPages(pdf.numPages)
@@ -108,14 +107,7 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
         toast({ title: 'PDF加载失败', description: e.message, variant: 'destructive' })
       }
     }
-    if (!window.pdfjsLib) {
-      document.head.appendChild(script)
-    } else {
-      script.onload()
-    }
-    return () => {
-      if (script && script.parentNode) script.parentNode.removeChild(script)
-    }
+    loadPdf()
   }, [pdfUrl])
 
   // 1. 获取页面尺寸
@@ -146,8 +138,8 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
       page: currentPage - 1,
       x: 300,
       y: 400,
-      width: 80,
-      height: 80,
+      width: 120,
+      height: 120,
       score: 1.0,
       reason: '手动添加',
       isDragging: false
@@ -174,8 +166,8 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
       page: pos.page || 0,
       x: pos.x,
       y: pos.y,
-      width: pos.width || 80,
-      height: pos.height || 80,
+      width: pos.width || 120,
+      height: pos.height || 120,
       reason: pos.reason,
       score: pos.score
     }))
@@ -273,8 +265,8 @@ const StepThree = ({ contractData, onComplete, onPrev }) => {
                   <div
                     className="absolute border-2 border-red-500 bg-red-100 bg-opacity-50 cursor-move flex items-center justify-center group"
                     style={{
-                      width: position.width || 80,
-                      height: position.height || 80,
+                      width: position.width || 120,
+                      height: position.height || 120,
                       zIndex: 10,
                       pointerEvents: 'auto'
                     }}

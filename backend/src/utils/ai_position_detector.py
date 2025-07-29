@@ -58,7 +58,7 @@ class AIPositionDetector:
         
         # 按分数排序，返回前3个最佳位置
         suggested_positions.sort(key=lambda x: x['score'], reverse=True)
-        return suggested_positions[:3]
+        return suggested_positions[:1]
     
     def _find_keyword_positions(self, text_blocks: List[Dict], page_width: float, page_height: float) -> List[Dict]:
         """查找关键词相关的位置"""

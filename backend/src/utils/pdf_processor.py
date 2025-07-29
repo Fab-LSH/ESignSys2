@@ -49,19 +49,19 @@ class PDFProcessor:
             date_text = f"日期: {date_str}"
             
             # 添加文本
-            page.insert_text(
-                (rect.width - 200, 30),  # 右上角位置
-                contract_text,
-                fontsize=10,
-                color=(0, 0, 0)
-            )
+            # page.insert_text(
+            #     (rect.width - 200, 30),  # 右上角位置
+            #     contract_text,
+            #     fontsize=10,
+            #     color=(0, 0, 0)
+            # )
             
-            page.insert_text(
-                (rect.width - 200, 50),  # 合同编号下方
-                date_text,
-                fontsize=10,
-                color=(0, 0, 0)
-            )
+            # page.insert_text(
+            #     (rect.width - 200, 50),  # 合同编号下方
+            #     date_text,
+            #     fontsize=10,
+            #     color=(0, 0, 0)
+            # )
             
             doc.save(output_path)
             doc.close()
@@ -79,8 +79,19 @@ class PDFProcessor:
                 page_num = position.get('page', 0)
                 x = position.get('x', 0)
                 y = position.get('y', 0)
-                width = position.get('width', 100)
-                height = position.get('height', 100)
+                page = doc[0]
+                # PyMuPDF默认单位为pt，1pt=1/72英寸
+                # 页面宽度（像素）= 页面宽度（pt）/ 72 * DPI
+                # 但fitz的rect.width就是像素
+                # 这里假设页面分辨率为72dpi，如果有更高分辨率可自定义
+                dpi = 72
+                # 如果页面有实际像素信息，可用 page.get_pixmap().width / page.rect.width * 72
+                # 这里采用标准72dpi
+                # 40mm转像素
+                mm = 40
+                width = height = int(mm / 25.4 * dpi)
+                # width = position.get('width', 120)
+                # height = position.get('height', 120)
                 
                 if page_num < len(doc):
                     page = doc[page_num]
@@ -100,21 +111,57 @@ class PDFProcessor:
             return False
     
     def _add_cross_page_stamps(self, doc, stamp_image_path):
-        """添加骑缝章"""
+        """骑缝章：将印章图片等分为N份，分别盖在每页边缘，整体宽度为40mm，按DPI换算像素"""
         try:
-            # 在每两页之间的边缘添加骑缝章
-            for i in range(len(doc) - 1):
+            from PIL import Image
+            import io
+
+            num_pages = len(doc)
+            if num_pages < 2:
+                return  # 单页无需骑缝章
+
+            # 计算DPI（以第一页为准）
+            page = doc[0]
+            # PyMuPDF默认单位为pt，1pt=1/72英寸
+            # 页面宽度（像素）= 页面宽度（pt）/ 72 * DPI
+            # 但fitz的rect.width就是像素
+            # 这里假设页面分辨率为72dpi，如果有更高分辨率可自定义
+            dpi = 72
+            # 如果页面有实际像素信息，可用 page.get_pixmap().width / page.rect.width * 72
+            # 这里采用标准72dpi
+            # 40mm转像素
+            mm = 40
+            px_total_width = int(mm / 25.4 * dpi)
+            px_height = px_total_width  # 高度也为40mm对应像素
+
+            # 打开骑缝章图片
+            stamp_img = Image.open(stamp_image_path).convert("RGBA")
+            w, h = stamp_img.size
+
+            # 每页分配的宽度
+            part_width = px_total_width // num_pages
+
+            for i in range(num_pages):
+                left = i * (w // num_pages)
+                right = left + (w // num_pages) if i < num_pages - 1 else w
+                part_img = stamp_img.crop((left, 0, right, h))
+
+                # 每页骑缝章尺寸：宽度为part_width，高度为px_height
+                part_img_resized = part_img.resize((part_width, px_height), Image.LANCZOS)
+
+                img_bytes = io.BytesIO()
+                part_img_resized.save(img_bytes, format="PNG")
+                img_bytes.seek(0)
+
+                # 盖在页面右侧中间，距离边缘5像素
                 page = doc[i]
                 rect = page.rect
-                
-                # 在页面右边缘添加骑缝章
-                stamp_rect = fitz.Rect(
-                    rect.width - 30,  # 右边缘
-                    rect.height / 2 - 25,  # 中间位置
-                    rect.width - 5,
-                    rect.height / 2 + 25
-                )
-                page.insert_image(stamp_rect, filename=stamp_image_path)
+                x0 = rect.width - part_width - 5
+                y0 = (rect.height - px_height) / 2
+                x1 = rect.width - 5
+                y1 = y0 + px_height
+                stamp_rect = fitz.Rect(x0, y0, x1, y1)
+                page.insert_image(stamp_rect, stream=img_bytes.getvalue(), overlay=True)
         except Exception as e:
             print(f"添加骑缝章错误: {e}")
     
@@ -184,6 +231,6 @@ class PDFProcessor:
         safe_counterparty = "".join(c for c in counterparty_abbr if c.isalnum() or c in ('-', '_'))
         safe_contract_name = "".join(c for c in contract_name if c.isalnum() or c in ('-', '_', '（', '）', '(', ')'))
         
-        filename = f"{safe_contract_number}-{safe_counterparty}-{safe_contract_name}.pdf"
+        filename = f"{safe_contract_number}{safe_counterparty}{safe_contract_name}.pdf"
         return filename
 
