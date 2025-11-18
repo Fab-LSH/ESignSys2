@@ -1,0 +1,2 @@
+class CommonClient(object):
+    pass

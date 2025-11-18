@@ -22,8 +22,8 @@ export default defineConfig({
     ],
     proxy:{
       '/api': {
-        // target: 'http://localhost:5050', // 后端实际端口
-        target: 'http://47.93.189.200:5050', // 直接使用公网IP
+        target: 'http://localhost:5050', // 后端实际端口
+        // target: 'http://47.93.189.200:5050', // 直接使用公网IP
         changeOrigin: true,
         // 添加安全配置
         secure: false,
